@@ -2,62 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Rivals - Final Movement Engine</title>
+    <title>Rivals - Ultimate Patch</title>
     <style>
-        :root { --rivals-green: #00ff66; --rivals-blue: #00ccff; --ui-panel: rgba(0,0,0,0.95); }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; color: #fff; user-select: none; }
+        :root { --rivals-green: #00ff66; --rivals-blue: #00ccff; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; color: #fff; }
         
-        /* THE CROSSHAIR (Only visible in match) */
-        #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 22px; height: 22px; z-index: 1000; pointer-events: none; display: none; }
-        #crosshair::before { content: ''; position: absolute; top: 10px; left: 0; width: 22px; height: 2px; background: var(--rivals-green); box-shadow: 0 0 8px var(--rivals-green); }
-        #crosshair::after { content: ''; position: absolute; left: 10px; top: 0; width: 2px; height: 22px; background: var(--rivals-green); box-shadow: 0 0 8px var(--rivals-green); }
+        /* CROSSHAIR */
+        #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; z-index: 1000; pointer-events: none; border: 2px solid var(--rivals-green); border-radius: 50%; }
 
-        /* INTERACT PROMPT */
-        #interact-ui { position: fixed; top: 65%; left: 50%; transform: translate(-50%, -50%); text-align: center; display: none; }
-        .prompt-box { background: #fff; color: #000; padding: 12px 30px; font-size: 22px; font-weight: 900; border: 4px solid var(--rivals-green); clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); }
+        /* INTERACT */
+        #interact-ui { position: fixed; top: 60%; left: 50%; transform: translate(-50%, -50%); display: none; background: #fff; color: #000; padding: 15px 40px; font-weight: 900; border: 4px solid var(--rivals-green); }
 
-        /* WEAPON SELECTION */
-        #weapon-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 5000; display: none; flex-direction: column; align-items: center; justify-content: center; }
-        #grid { width: 85%; height: 55vh; background: var(--ui-panel); border: 6px solid #fff; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; padding: 25px; overflow-y: scroll; }
-        .card { background: #1a1a1a; border: 2px solid #333; padding: 20px; cursor: pointer; transition: 0.15s; text-align: center; }
-        .card:hover { border-color: var(--rivals-blue); transform: translateY(-3px); }
-        .card.active { border-color: var(--rivals-green); background: #222; box-shadow: 0 0 20px rgba(0,255,102,0.3); }
+        /* WEAPON LOADOUT (THE REAL ONE) */
+        #weapon-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        #grid { width: 90%; height: 60vh; background: #111; border: 5px solid #fff; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; padding: 30px; overflow-y: scroll; }
+        .card { background: #222; border: 2px solid #444; padding: 20px; cursor: pointer; text-align: center; font-size: 14px; }
+        .card:hover { border-color: var(--rivals-blue); background: #333; }
+        .card.active { border-color: var(--rivals-green); background: #000; box-shadow: 0 0 20px var(--rivals-green); }
 
-        /* HUD ELEMENTS */
-        #hud { position: absolute; bottom: 40px; left: 40px; display: none; }
-        #hp-frame { width: 350px; height: 35px; background: #000; border: 3px solid #fff; position: relative; }
-        #hp-fill { width: 100%; height: 100%; background: var(--rivals-green); transition: 0.1s; }
-        #stamina-frame { width: 120px; height: 8px; background: #222; margin-top: 10px; border: 2px solid #fff; }
-        #stamina-fill { width: 100%; height: 100%; background: var(--rivals-blue); }
+        /* HUD */
+        #hud { position: absolute; bottom: 40px; left: 40px; }
+        #hp-bar-outer { width: 300px; height: 30px; background: #000; border: 3px solid #fff; position: relative; }
+        #hp-bar-inner { width: 100%; height: 100%; background: var(--rivals-green); transition: 0.1s; }
+        
+        #killfeed { position: absolute; top: 120px; right: 20px; text-align: right; }
+        .kill-msg { background: rgba(0,0,0,0.7); padding: 10px 20px; margin-bottom: 5px; border-left: 5px solid var(--rivals-green); }
 
-        #kill-log { position: absolute; top: 120px; right: 30px; text-align: right; }
-        .log-entry { background: rgba(0,255,102,0.1); border-right: 6px solid var(--rivals-green); padding: 10px 25px; margin-bottom: 8px; font-size: 15px; font-style: italic; animation: pop 0.2s ease-out; }
-        @keyframes pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-
-        #score-board { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #fff; color: #000; padding: 10px 60px; font-size: 32px; font-weight: 900; border: 6px solid #000; display: none; }
         #deploy-btn { margin-top: 30px; padding: 20px 100px; font-size: 30px; background: var(--rivals-green); border: none; font-weight: 900; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="crosshair"></div>
-    <div id="score-board">YOU: <span id="p-score">0</span> - BOT: <span id="b-score">0</span></div>
-    
-    <div id="interact-ui"><div class="prompt-box">CLICK TERMINAL TO START</div></div>
+    <div id="interact-ui">CLICK TERMINAL TO START MATCH</div>
 
     <div id="weapon-screen">
-        <h1 style="font-size: 60px; margin-bottom: 10px;">RIVALS <span style="color:var(--rivals-blue)">LOADOUT</span></h1>
+        <h1 style="font-size: 50px;">CHOOSE WEAPON <span style="color:var(--rivals-blue)">(52 MODELS)</span></h1>
         <div id="grid"></div>
-        <button id="deploy-btn" onclick="deploy()">DEPLOY TO ARENA</button>
+        <button id="deploy-btn" onclick="deploy()">START MATCH</button>
     </div>
 
     <div id="hud">
-        <div id="hp-frame"><div id="hp-fill"></div></div>
-        <div id="stamina-frame"><div id="stamina-fill"></div></div>
-        <h2 id="weapon-name" style="letter-spacing: 4px; margin-top: 15px;">ASSAULT RIFLE</h2>
+        <div id="hp-bar-outer"><div id="hp-bar-inner"></div></div>
+        <h2 id="gun-name" style="letter-spacing: 5px; text-transform: uppercase;">READY</h2>
     </div>
 
-    <div id="kill-log"></div>
+    <div id="killfeed"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
     <script type="importmap">
@@ -67,123 +57,125 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let isMatch = false, hp = 150, botHp = 150, pScore = 0, bScore = 0;
-        let selectedId = 0, canJump = true, isSliding = false, slideCooldown = false;
+        let isMatch = false, pScore = 0, botHp = 150, selectedId = 0;
+        let canJump = true, isSliding = false;
 
-        // --- 1. PHYSICS SETUP ---
+        // --- 1. ROBUST PHYSICS (No Phasing) ---
         const world = new CANNON.World();
-        world.gravity.set(0, -35, 0); // High gravity for snappy landing
+        world.gravity.set(0, -30, 0);
+        
         const pBody = new CANNON.Body({ mass: 1, fixedRotation: true });
-        pBody.addShape(new CANNON.Sphere(0.9));
-        pBody.position.set(0, 5, 25); 
-        pBody.linearDamping = 0.5; // Stops sliding infinitely
+        pBody.addShape(new CANNON.Sphere(1.0)); // Larger hit sphere
+        pBody.position.set(0, 10, 80); // Spawn in Lobby
+        pBody.linearDamping = 0.5;
         world.addBody(pBody);
 
-        // --- 2. THE ARENA ---
+        // --- 2. THE MEGA MAP ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xaaccff);
+        scene.background = new THREE.Color(0x87CEEB);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        const gridCtx = document.createElement('canvas').getContext('2d');
-        gridCtx.canvas.width = 64; gridCtx.canvas.height = 64;
-        gridCtx.fillStyle = '#fff'; gridCtx.fillRect(0,0,64,64);
-        gridCtx.strokeStyle = '#eee'; gridCtx.lineWidth = 1; gridCtx.strokeRect(0,0,64,64);
-        const gridTex = new THREE.CanvasTexture(gridCtx.canvas);
+        const gridTex = new THREE.TextureLoader().load('https://threejs.org/examples/textures/grid.png');
         gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping;
-        gridTex.repeat.set(150, 150);
+        gridTex.repeat.set(200, 200);
 
-        const arenaMat = new THREE.MeshStandardMaterial({ map: gridTex });
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), arenaMat);
-        floor.rotation.x = -Math.PI/2; floor.receiveShadow = true;
-        scene.add(floor);
+        const arenaMat = new THREE.MeshStandardMaterial({ map: gridTex, color: 0xffffff });
 
-        function makeBlock(x,y,z,w,h,d, color=0xffffff) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({map: gridTex, color: color}));
-            m.position.set(x,y,z); m.castShadow = m.receiveShadow = true;
+        function createObject(x, y, z, w, h, d, color = 0xffffff, isTerminal = false) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({map: gridTex, color: color}));
+            m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
             scene.add(m);
             const b = new CANNON.Body({ mass: 0 });
             b.addShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)));
-            b.position.set(x,y,z); world.addBody(b);
+            b.position.set(x, y, z);
+            world.addBody(b);
+            if(isTerminal) m.userData.terminal = true;
             return m;
         }
 
-        // LOBBY & TERMINAL
-        const spawnPlatform = makeBlock(0, 1, 30, 25, 0.4, 25, 0xdddddd);
-        const terminal = makeBlock(0, 2.5, 20, 4, 4, 1, 0x00ff66);
+        // MASSIVE FLOORS (Thick to prevent phasing)
+        createObject(0, -1, 0, 1000, 2, 1000, 0xeeeeee); // Main Arena Floor
+        createObject(0, 2, 80, 60, 4, 60, 0xaaaaaa); // Lobby Platform
 
-        // MATCH OBSTACLES
-        makeBlock(0, 4, -15, 10, 8, 10); // Center
-        makeBlock(-20, 3, -10, 8, 6, 8); makeBlock(20, 3, -10, 8, 6, 8); // Sides
+        // THE START TERMINAL
+        const terminal = createObject(0, 6, 60, 4, 6, 2, 0x00ff66, true);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-        const sun = new THREE.DirectionalLight(0xffffff, 1);
-        sun.position.set(50, 100, 50); sun.castShadow = true;
-        scene.add(sun);
+        // ARENA OBSTACLES
+        createObject(0, 6, 0, 15, 12, 15); // Central Tower
+        createObject(-25, 4, -10, 10, 8, 10); createObject(25, 4, -10, 10, 8, 10);
 
-        // --- 3. THE BOT AVATAR ---
-        const bot = new THREE.Group();
-        const bTorso = new THREE.Mesh(new THREE.BoxGeometry(1, 1.4, 0.5), new THREE.MeshStandardMaterial({color: 0xff4444}));
-        const bHead = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshStandardMaterial({color: 0x222}));
-        bHead.position.y = 1.1;
-        const bArmL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 0.3), new THREE.MeshStandardMaterial({color: 0xff4444}));
-        bArmL.position.set(-0.7, 0.2, 0);
-        const bArmR = bArmL.clone(); bArmR.position.x = 0.7;
-        bot.add(bTorso, bHead, bArmL, bArmR);
-        bot.position.set(0, 1.2, -40);
-        scene.add(bot);
-        bot.visible = false;
+        scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-        // --- 4. WEAPONS ---
-        const gunPivot = new THREE.Group();
-        camera.add(gunPivot);
-        const guns = [
-            { name: "Phantom", color: 0x333333 }, { name: "Wraith", color: 0x00ccff }, 
-            { name: "Slayer", color: 0x550000 }, { name: "Viper", color: 0x111111 }
-        ];
+        // --- 3. DUMMIES & RIVAL BOT ---
+        const bots = [];
+        function spawnBot(x, y, z, isRealRival = false) {
+            const group = new THREE.Group();
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.6), new THREE.MeshStandardMaterial({color: isRealRival ? 0xff0000 : 0x555555}));
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({color: 0x222222}));
+            head.position.y = 1.4;
+            group.add(torso, head);
+            group.position.set(x, y, z);
+            scene.add(group);
+            group.userData.hp = 150;
+            group.userData.isRival = isRealRival;
+            bots.push(group);
+            return group;
+        }
+
+        // Practice Dummies in Lobby
+        spawnBot(-15, 6, 70); spawnBot(15, 6, 70);
+        // The Arena Rival (Hidden until match)
+        const rival = spawnBot(0, 6, -40, true);
+        rival.visible = false;
+
+        // --- 4. 52 WEAPON FACTORY ---
+        const gunGroup = new THREE.Group();
+        camera.add(gunGroup);
+        const weaponNames = ["Viper", "Wraith", "Phantom", "Slayer", "Neon", "Titan", "Cobra", "Reaper"];
 
         function buildGun(id) {
-            while(gunPivot.children.length > 0) gunPivot.remove(gunPivot.children[0]);
-            const g = guns[id % guns.length];
-            const m = new THREE.MeshStandardMaterial({ color: g.color });
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.7), m);
-            gunPivot.add(body);
-            const b = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8), new THREE.MeshStandardMaterial({color:0x000}));
-            b.rotation.x = 1.57; b.position.z = -0.6; gunPivot.add(b);
-            gunPivot.position.set(0.4, -0.4, -0.7);
-            document.getElementById('weapon-name').innerText = g.name + " V" + (id+1);
+            while(gunGroup.children.length > 0) gunGroup.remove(gunGroup.children[0]);
+            const color = id % 2 === 0 ? 0x222222 : 0x00ccff;
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.8), new THREE.MeshStandardMaterial({color: color}));
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1), new THREE.MeshStandardMaterial({color: 0x000000}));
+            barrel.rotation.x = 1.57; barrel.position.z = -0.7;
+            gunGroup.add(body, barrel);
+            gunGroup.position.set(0.5, -0.5, -1);
+            document.getElementById('gun-name').innerText = weaponNames[id % weaponNames.length] + " V" + (id + 1);
         }
 
-        const gridDiv = document.getElementById('grid');
+        const grid = document.getElementById('grid');
         for(let i=0; i<52; i++) {
             const c = document.createElement('div'); c.className = 'card';
-            c.innerHTML = `<b>${guns[i % guns.length].name}</b><br>v${i+1}`;
+            c.innerHTML = `<b>${weaponNames[i % weaponNames.length]}</b><br>v${i+1}`;
             c.onclick = () => { document.querySelectorAll('.card').forEach(x => x.classList.remove('active')); c.classList.add('active'); selectedId = i; };
-            gridDiv.appendChild(c);
+            grid.appendChild(c);
         }
 
-        // --- 5. COMBAT & MOVEMENT ---
-        function shoot() {
+        // --- 5. CORE MECHANICS ---
+        function fire() {
             const tracer = new THREE.Line(
-                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0.4,-0.4,-0.8), new THREE.Vector3(0.4,-0.4,-150)]),
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0.5,-0.5,-1), new THREE.Vector3(0.5,-0.5,-200)]),
                 new THREE.LineBasicMaterial({color: 0xffff00})
             );
             camera.add(tracer); setTimeout(() => camera.remove(tracer), 40);
 
             const ray = new THREE.Raycaster();
             ray.setFromCamera(new THREE.Vector2(0,0), camera);
-            const hits = ray.intersectObject(bot, true);
-            if(hits.length > 0 && isMatch) {
-                botHp -= 45;
-                if(botHp <= 0) {
-                    pScore++; document.getElementById('p-score').innerText = pScore;
-                    botHp = 150;
-                    const log = document.createElement('div'); log.className = 'log-entry'; log.innerText = "PLAYER_1 ELIMINATED RIVAL_BOT";
-                    document.getElementById('kill-log').appendChild(log); setTimeout(() => log.remove(), 2500);
-                    bot.position.set(Math.random()*60-30, 1.2, -Math.random()*40 - 20);
+            const hits = ray.intersectObjects(bots, true);
+            if(hits.length > 0) {
+                const target = hits[0].object.parent;
+                target.userData.hp -= 50;
+                if(target.userData.hp <= 0) {
+                    const msg = document.createElement('div'); msg.className = 'kill-msg';
+                    msg.innerText = target.userData.isRival ? "ELIMINATED RIVAL" : "DUMMY DESTROYED";
+                    document.getElementById('killfeed').appendChild(msg); setTimeout(() => msg.remove(), 2000);
+                    target.userData.hp = 150;
+                    if(target.userData.isRival) target.position.set(Math.random()*60-30, 6, -Math.random()*50);
                 }
             }
         }
@@ -191,22 +183,9 @@
         const keys = {};
         window.onkeydown = e => {
             keys[e.key.toLowerCase()] = true;
-            // JUMP FIX: Space triggers upward velocity
-            if(e.key === ' ' && canJump) {
-                pBody.velocity.y = 14; 
-                canJump = false; 
-                setTimeout(() => canJump = true, 800); 
-            }
-            if((e.key === 'e' || e.shiftKey) && !slideCooldown) startSlide();
+            if(e.key === ' ' && canJump) { pBody.velocity.y = 15; canJump = false; setTimeout(()=>canJump=true, 800); }
         };
         window.onkeyup = e => keys[e.key.toLowerCase()] = false;
-
-        function startSlide() {
-            isSliding = true; slideCooldown = true;
-            document.getElementById('stamina-fill').style.width = '0%';
-            setTimeout(() => isSliding = false, 700);
-            setTimeout(() => { slideCooldown = false; document.getElementById('stamina-fill').style.width = '100%'; }, 2000);
-        }
 
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === document.body) {
@@ -218,36 +197,33 @@
 
         window.onmousedown = e => {
             if (document.pointerLockElement !== document.body) { document.body.requestPointerLock(); return; }
-            if (isMatch) { if(e.button === 0) shoot(); }
-            else {
-                const ray = new THREE.Raycaster();
-                ray.setFromCamera(new THREE.Vector2(0,0), camera);
-                if(ray.intersectObject(terminal).length > 0) {
-                    document.exitPointerLock();
-                    document.getElementById('weapon-screen').style.display = 'flex';
-                }
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(0,0), camera);
+            const termHit = ray.intersectObject(terminal);
+            
+            if(termHit.length > 0 && !isMatch) {
+                document.exitPointerLock();
+                document.getElementById('weapon-screen').style.display = 'flex';
+            } else {
+                fire();
             }
         };
 
         function loop() {
             requestAnimationFrame(loop);
             world.step(1/60);
-
-            let s = isSliding ? 0.8 : (keys['w'] || keys['s'] || keys['a'] || keys['d'] ? 0.25 : 0);
+            
+            let s = 0.3;
             let m = new THREE.Vector3(0,0,0);
             if(keys['w']) m.z -= s; if(keys['s']) m.z += s;
             if(keys['a']) m.x -= s; if(keys['d']) m.x += s;
             m.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, camera.rotation.y, 0)));
             pBody.position.x += m.x; pBody.position.z += m.z;
-            
-            camera.position.copy(pBody.position); 
-            camera.position.y += isSliding ? -0.4 : 0.8;
+            camera.position.copy(pBody.position); camera.position.y += 0.8;
 
-            if(!isMatch) {
-                const ray = new THREE.Raycaster();
-                ray.setFromCamera(new THREE.Vector2(0,0), camera);
-                document.getElementById('interact-ui').style.display = ray.intersectObject(terminal).length > 0 ? 'block' : 'none';
-            }
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(0,0), camera);
+            document.getElementById('interact-ui').style.display = (!isMatch && ray.intersectObject(terminal).length > 0) ? 'block' : 'none';
 
             renderer.render(scene, camera);
         }
@@ -255,16 +231,13 @@
         window.deploy = () => {
             document.getElementById('weapon-screen').style.display = 'none';
             document.body.requestPointerLock();
-            isMatch = true; bot.visible = true;
-            document.getElementById('crosshair').style.display = 'block';
-            document.getElementById('hud').style.display = 'block';
-            document.getElementById('score-board').style.display = 'block';
+            isMatch = true;
+            rival.visible = true;
             buildGun(selectedId);
-            pBody.position.set(0, 5, 0); 
+            pBody.position.set(0, 10, 0); // TELEPORT TO ARENA
         };
 
-        window.oncontextmenu = e => e.preventDefault();
-        loop();
+        buildGun(0); loop();
     </script>
 </body>
 </html>
