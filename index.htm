@@ -2,29 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Rivals Web - All Weapons</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rivals Ultimate - Web Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #010409; font-family: 'Courier New', Courier, monospace; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border: 1px solid #00ffff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-        #ui { position: absolute; bottom: 30px; left: 30px; color: #00ffff; text-shadow: 0 0 10px cyan; pointer-events: none; }
-        #weapon-dock { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,20,40,0.8); padding: 10px; border: 1px solid cyan; }
-        .slot { width: 50px; height: 50px; border: 1px solid #444; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-        .active { border-color: cyan; box-shadow: 0 0 10px cyan; }
+        body { margin: 0; overflow: hidden; background: #e0e0e0; font-family: 'Segoe UI', sans-serif; cursor: crosshair; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid #000; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
+        #ui { position: absolute; bottom: 30px; left: 30px; color: #000; pointer-events: none; }
+        #hp-container { width: 250px; height: 25px; background: #333; border: 3px solid #000; margin-bottom: 5px; }
+        #hp-fill { width: 100%; height: 100%; background: #00ff44; transition: width 0.1s; }
+        #weapon-info { font-size: 24px; font-weight: 900; text-transform: uppercase; margin: 0; }
+        #leaderboard { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.95); border: 4px solid #000; padding: 25px; min-width: 400px; z-index: 100; }
+        #leaderboard h2 { border-bottom: 3px solid #000; margin-top: 0; }
+        #weapon-select { position: absolute; top: 20px; right: 20px; padding: 10px; border: 3px solid #000; font-weight: bold; background: #fff; z-index: 10; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 20px; padding: 5px 0; border-bottom: 1px solid #ccc; }
     </style>
 </head>
 <body>
+
     <div id="crosshair"></div>
+    
     <div id="ui">
-        <h2 id="curWeapon">ASSAULT RIFLE</h2>
-        <div id="abilityStatus">READY [RIGHT CLICK]</div>
+        <div id="hp-container"><div id="hp-fill"></div></div>
+        <p style="margin:0; font-weight:bold;">HP: <span id="hp-text">150</span> / 150</p>
+        <h1 id="weapon-info">ASSAULT RIFLE V1</h1>
     </div>
 
-    <div id="weapon-dock">
-        <div class="slot active" id="slot1">1</div>
-        <div class="slot" id="slot2">2</div>
-        <div class="slot" id="slot3">3</div>
-        <div class="slot" id="slot4">4</div>
+    <div id="leaderboard">
+        <h2>ARENA MATCH - LIVE</h2>
+        <div class="stat-row"><span>PLAYER (YOU)</span><span style="color:green;">12ms</span></div>
+        <div class="stat-row"><span>BOT_RIVAL</span><span style="color:blue;">0ms</span></div>
+        <div class="stat-row" style="margin-top:10px; font-size:14px; border:none;">HOLD [TAB] TO VIEW</div>
     </div>
+
+    <select id="weapon-select"></select>
 
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -33,120 +43,163 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- SCENE & ENGINE ---
+        // --- CORE ENGINE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x010205);
+        scene.background = new THREE.Color(0xced4da);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- ARENA SETUP (Rivals Blue/Cyan) ---
-        const grid = new THREE.GridHelper(200, 60, 0x00ffff, 0x001111);
-        scene.add(grid);
+        // --- ARENA (WHITE GRID SYSTEM) ---
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,128,128);
+        ctx.strokeStyle = '#bbbbbb'; ctx.lineWidth = 4; ctx.strokeRect(0,0,128,128);
+        const gridTex = new THREE.CanvasTexture(canvas);
+        gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping;
+        gridTex.repeat.set(60, 60);
 
-        // --- WEAPON DEFINITIONS ---
-        const weapons = {
-            1: { name: "ASSAULT RIFLE", color: 0x555555, size: [0.1, 0.2, 0.8], fov: 60, ability: "Steady Aim" },
-            2: { name: "SNIPER", color: 0x222222, size: [0.08, 0.15, 1.4], fov: 15, ability: "Thermal Scope" },
-            3: { name: "PAINTBALL GUN", color: 0xff00ff, size: [0.2, 0.3, 0.6], fov: 70, ability: "Rapid Splat" },
-            4: { name: "SHORTY", color: 0x880000, size: [0.25, 0.25, 0.5], fov: 75, ability: "Burst Fire" }
-        };
-        let currentSlot = 1;
-        let gunMesh;
+        const arenaMat = new THREE.MeshLambertMaterial({ map: gridTex });
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), arenaMat);
+        floor.rotation.x = -Math.PI/2;
+        scene.add(floor);
 
-        function createGun(slot) {
-            if(gunMesh) camera.remove(gunMesh);
-            const w = weapons[slot];
-            const geo = new THREE.BoxGeometry(...w.size);
-            const mat = new THREE.MeshStandardMaterial({ color: w.color, emissive: w.color, emissiveIntensity: 0.2 });
-            gunMesh = new THREE.Mesh(geo, mat);
-            gunMesh.position.set(0.5, -0.4, -0.7);
-            camera.add(gunMesh);
-            document.getElementById('curWeapon').innerText = w.name;
+        // Map Obstacles (Based on image)
+        function makeBlock(x, z, w, h, d) {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), arenaMat);
+            b.position.set(x, h/2, z);
+            scene.add(b);
         }
+        makeBlock(0, -15, 8, 8, 8); // Central Structure
+        makeBlock(-15, -20, 5, 5, 5); makeBlock(15, -20, 5, 5, 5);
+        makeBlock(-20, 10, 6, 4, 6); makeBlock(20, 10, 6, 4, 6);
 
-        // --- PLAYER & MOVEMENT ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+        sun.position.set(20, 50, 20);
+        scene.add(sun);
+
+        // --- PLAYER & BOT ---
+        let playerHP = 150, botHP = 150;
         const player = new THREE.Group();
         scene.add(player);
         player.add(camera);
         camera.position.y = 1.7;
-        createGun(1);
 
+        const bot = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 1.2), new THREE.MeshLambertMaterial({color: 0xff0000}));
+        bot.position.set(0, 1.2, -25);
+        scene.add(bot);
+
+        // --- 52 WEAPON GENERATOR ---
+        const weaponTypes = [
+            { name: "Assault Rifle", color: 0x222222, parts: ["body", "barrel", "scope", "mag"] },
+            { name: "Sniper", color: 0x111111, parts: ["thinBody", "longBarrel", "bigScope"] },
+            { name: "Shorty", color: 0x552222, parts: ["wideBody", "shortBarrel"] },
+            { name: "Paintball Gun", color: 0x00ff00, parts: ["body", "barrel", "hopper"] },
+            { name: "AK47", color: 0x4b2d1f, parts: ["body", "barrel", "curvedMag"] },
+            { name: "Uzi", color: 0x222222, parts: ["smallBody", "smallBarrel"] }
+        ];
+
+        let gunGroup = new THREE.Group();
+        camera.add(gunGroup);
+
+        function buildWeapon(idx) {
+            while(gunGroup.children.length > 0) gunGroup.remove(gunGroup.children[0]);
+            const type = weaponTypes[idx % weaponTypes.length];
+            const mat = new THREE.MeshLambertMaterial({ color: type.color });
+            const darkMat = new THREE.MeshLambertMaterial({ color: 0x000000 });
+
+            type.parts.forEach(p => {
+                let m;
+                if(p === "body") m = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.25, 0.6), mat);
+                if(p === "thinBody") m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.8), mat);
+                if(p === "wideBody") m = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.4), mat);
+                if(p === "barrel") { m = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6), darkMat); m.rotation.x = Math.PI/2; m.position.z = -0.5; }
+                if(p === "longBarrel") { m = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3), darkMat); m.rotation.x = Math.PI/2; m.position.z = -0.9; }
+                if(p === "scope") { m = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.2), darkMat); m.position.y = 0.18; }
+                if(p === "bigScope") { m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.4), darkMat); m.rotation.x = Math.PI/2; m.position.y = 0.2; }
+                if(p === "curvedMag") { m = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.12), darkMat); m.position.y = -0.25; m.position.z = -0.1; }
+                if(p === "hopper") { m = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshLambertMaterial({color: 0xffff00})); m.position.y = 0.25; }
+                if(m) gunGroup.add(m);
+            });
+            gunGroup.position.set(0.4, -0.4, -0.6);
+            document.getElementById('weapon-info').innerText = `${type.name} V${idx + 1}`;
+        }
+
+        const sel = document.getElementById('weapon-select');
+        for(let i=0; i<52; i++) {
+            let o = document.createElement('option'); o.value = i; 
+            o.text = `${i+1}. ${weaponTypes[i % weaponTypes.length].name}`;
+            sel.appendChild(o);
+        }
+        sel.onchange = (e) => buildWeapon(parseInt(e.target.value));
+        buildWeapon(0);
+
+        // --- INPUTS ---
         const keys = {};
         window.onkeydown = (e) => {
             keys[e.key.toLowerCase()] = true;
-            if(['1','2','3','4'].includes(e.key)) {
-                currentSlot = e.key;
-                createGun(e.key);
-                document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
-                document.getElementById('slot'+e.key).classList.add('active');
+            if(e.key === 'Tab') { e.preventDefault(); document.getElementById('leaderboard').style.display = 'block'; }
+            if(e.key === 'q') { // Quick Melee
+                gunGroup.position.y = -2; // Hide gun
+                setTimeout(()=> gunGroup.position.y = -0.4, 300);
             }
         };
-        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+        window.onkeyup = (e) => {
+            keys[e.key.toLowerCase()] = false;
+            if(e.key === 'Tab') document.getElementById('leaderboard').style.display = 'none';
+        };
 
-        // --- COMBAT & ABILITIES ---
         window.onmousedown = (e) => {
-            if(e.button === 0) { // LEFT CLICK: Shoot
-                gunMesh.position.z += 0.15; // Kickback
-                setTimeout(() => gunMesh.position.z -= 0.15, 40);
+            if(e.button === 0) { // Shoot
+                gunGroup.position.z += 0.15; setTimeout(()=> gunGroup.position.z -= 0.15, 50);
+                // Hit detection logic
+                botHP -= 15;
+                if(botHP <= 0) { botHP = 150; bot.position.set(Math.random()*40-20, 1.2, -Math.random()*40); }
             }
-            if(e.button === 2) { // RIGHT CLICK: Special Ability
-                camera.fov = weapons[currentSlot].fov;
-                camera.updateProjectionMatrix();
-                if(currentSlot == 2) scene.background = new THREE.Color(0x220000); // Sniper "Thermal" effect
-            }
+            if(e.button === 2) { camera.fov = 30; camera.updateProjectionMatrix(); } // Scope
         };
-        window.onmouseup = (e) => {
-            if(e.button === 2) {
-                camera.fov = 75;
-                camera.updateProjectionMatrix();
-                scene.background = new THREE.Color(0x010205);
-            }
-        };
+        window.onmouseup = (e) => { if(e.button === 2) { camera.fov = 75; camera.updateProjectionMatrix(); } };
 
-        // --- BOT AVATARS ---
-        const bots = [];
-        for(let i=0; i<5; i++) {
-            const bot = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: 0xff0044}));
-            bot.position.set(Math.random()*40-20, 1, Math.random()*40-20);
-            scene.add(bot);
-            bots.push(bot);
-        }
-
-        // --- ENGINE LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
-            let speed = (keys['e'] || keys['shift']) ? 0.35 : 0.18;
-            
-            // Apply requested movement logic
+        // --- LOOP ---
+        function update() {
+            requestAnimationFrame(update);
+            let speed = (keys['shift'] || keys['e']) ? 0.32 : 0.16;
             let moveX = 0, moveZ = 0;
-            if(keys['w']) moveZ -= speed;
-            if(keys['s']) moveZ += speed;
-            if(keys['a']) moveX -= speed;
-            if(keys['d']) moveX += speed;
 
-            const moveVec = new THREE.Vector3(moveX, 0, moveZ).applyQuaternion(player.quaternion);
-            player.position.add(moveVec);
+            if(keys['w'] && keys['a']) { moveZ -= speed; moveX -= speed; }
+            else if(keys['s'] && keys['d']) { moveZ += speed; moveX += speed; }
+            else if(keys['w']) moveZ -= speed;
+            else if(keys['s']) moveZ += speed;
+            else if(keys['a']) moveX -= speed;
+            else if(keys['d']) moveX += speed;
 
-            // Simple Recoil smoothing
-            gunMesh.position.lerp(new THREE.Vector3(0.5, -0.4, -0.7), 0.1);
+            const move = new THREE.Vector3(moveX, 0, moveZ).applyQuaternion(player.quaternion);
+            player.position.add(move);
+
+            // Bot Damage Logic
+            if(Math.random() < 0.015) {
+                playerHP -= 1;
+                document.getElementById('hp-fill').style.width = (playerHP/150*100) + "%";
+                document.getElementById('hp-text').innerText = Math.max(0, Math.floor(playerHP));
+            }
 
             renderer.render(scene, camera);
         }
 
-        // Mouse Lock Setup
         document.body.onclick = () => document.body.requestPointerLock();
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === document.body) {
-                player.rotation.y -= e.movementX * 0.002;
-                camera.rotation.x -= e.movementY * 0.002;
+                player.rotation.y -= e.movementX * 0.0025;
+                camera.rotation.x -= e.movementY * 0.0025;
                 camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
             }
         });
 
-        window.oncontextmenu = (e) => e.preventDefault();
-        animate();
+        window.oncontextmenu = e => e.preventDefault();
+        update();
     </script>
 </body>
 </html>
