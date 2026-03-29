@@ -2,146 +2,151 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rivals Web Clone</title>
+    <title>Rivals Web - All Weapons</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; pointer-events: none; }
-        #crosshair { 
-            position: absolute; top: 50%; left: 50%; 
-            width: 10px; height: 10px; border: 2px solid white; 
-            border-radius: 50%; transform: translate(-50%, -50%); 
-        }
-        #leaderboard {
-            display: none; position: absolute; top: 20%; left: 35%; 
-            width: 30%; background: rgba(0,0,0,0.8); color: gold; 
-            padding: 20px; border: 2px solid #444;
-        }
+        body { margin: 0; overflow: hidden; background: #010409; font-family: 'Courier New', Courier, monospace; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border: 1px solid #00ffff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        #ui { position: absolute; bottom: 30px; left: 30px; color: #00ffff; text-shadow: 0 0 10px cyan; pointer-events: none; }
+        #weapon-dock { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,20,40,0.8); padding: 10px; border: 1px solid cyan; }
+        .slot { width: 50px; height: 50px; border: 1px solid #444; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .active { border-color: cyan; box-shadow: 0 0 10px cyan; }
     </style>
 </head>
 <body>
-
-    <div id="ui">
-        <div>Health: 100</div>
-        <div>Weapon: Assault Rifle</div>
-    </div>
     <div id="crosshair"></div>
-    <div id="leaderboard">
-        <h3>ARENA LEADERBOARD</h3>
-        <p>Player: 0 Ping</p>
-        <p>Bot_Sniper: 15 Ping</p>
-        <p>Bot_Shorty: 22 Ping</p>
+    <div id="ui">
+        <h2 id="curWeapon">ASSAULT RIFLE</h2>
+        <div id="abilityStatus">READY [RIGHT CLICK]</div>
+    </div>
+
+    <div id="weapon-dock">
+        <div class="slot active" id="slot1">1</div>
+        <div class="slot" id="slot2">2</div>
+        <div class="slot" id="slot3">3</div>
+        <div class="slot" id="slot4">4</div>
     </div>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
 
     <script type="module">
         import * as THREE from 'three';
 
-        // --- Setup Scene ---
+        // --- SCENE & ENGINE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
+        scene.background = new THREE.Color(0x010205);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- Lighting ---
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 7.5);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x404040));
+        // --- ARENA SETUP (Rivals Blue/Cyan) ---
+        const grid = new THREE.GridHelper(200, 60, 0x00ffff, 0x001111);
+        scene.add(grid);
 
-        // --- The "Arena" Map ---
-        const floorGeo = new THREE.PlaneGeometry(100, 100);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
+        // --- WEAPON DEFINITIONS ---
+        const weapons = {
+            1: { name: "ASSAULT RIFLE", color: 0x555555, size: [0.1, 0.2, 0.8], fov: 60, ability: "Steady Aim" },
+            2: { name: "SNIPER", color: 0x222222, size: [0.08, 0.15, 1.4], fov: 15, ability: "Thermal Scope" },
+            3: { name: "PAINTBALL GUN", color: 0xff00ff, size: [0.2, 0.3, 0.6], fov: 70, ability: "Rapid Splat" },
+            4: { name: "SHORTY", color: 0x880000, size: [0.25, 0.25, 0.5], fov: 75, ability: "Burst Fire" }
+        };
+        let currentSlot = 1;
+        let gunMesh;
 
-        // Simple Arena Walls
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-        const wallGeo = new THREE.BoxGeometry(100, 10, 1);
-        const wall1 = new THREE.Mesh(wallGeo, wallMat);
-        wall1.position.set(0, 5, -50);
-        scene.add(wall1);
+        function createGun(slot) {
+            if(gunMesh) camera.remove(gunMesh);
+            const w = weapons[slot];
+            const geo = new THREE.BoxGeometry(...w.size);
+            const mat = new THREE.MeshStandardMaterial({ color: w.color, emissive: w.color, emissiveIntensity: 0.2 });
+            gunMesh = new THREE.Mesh(geo, mat);
+            gunMesh.position.set(0.5, -0.4, -0.7);
+            camera.add(gunMesh);
+            document.getElementById('curWeapon').innerText = w.name;
+        }
 
-        // --- Player Logic ---
+        // --- PLAYER & MOVEMENT ---
         const player = new THREE.Group();
         scene.add(player);
-        camera.position.set(0, 1.6, 0); 
         player.add(camera);
+        camera.position.y = 1.7;
+        createGun(1);
 
-        // Movement State
         const keys = {};
-        let isSliding = false;
-
-        document.addEventListener('keydown', (e) => { 
+        window.onkeydown = (e) => {
             keys[e.key.toLowerCase()] = true;
-            if (e.key === 'Tab') { 
-                e.preventDefault(); 
-                document.getElementById('leaderboard').style.display = 'block'; 
+            if(['1','2','3','4'].includes(e.key)) {
+                currentSlot = e.key;
+                createGun(e.key);
+                document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+                document.getElementById('slot'+e.key).classList.add('active');
             }
-        });
-        document.addEventListener('keyup', (e) => { 
-            keys[e.key.toLowerCase()] = false;
-            if (e.key === 'Tab') document.getElementById('leaderboard').style.display = 'none';
-        });
+        };
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
-        // Pointer Lock for Aiming
-        document.body.addEventListener('click', () => {
-            document.body.requestPointerLock();
-        });
+        // --- COMBAT & ABILITIES ---
+        window.onmousedown = (e) => {
+            if(e.button === 0) { // LEFT CLICK: Shoot
+                gunMesh.position.z += 0.15; // Kickback
+                setTimeout(() => gunMesh.position.z -= 0.15, 40);
+            }
+            if(e.button === 2) { // RIGHT CLICK: Special Ability
+                camera.fov = weapons[currentSlot].fov;
+                camera.updateProjectionMatrix();
+                if(currentSlot == 2) scene.background = new THREE.Color(0x220000); // Sniper "Thermal" effect
+            }
+        };
+        window.onmouseup = (e) => {
+            if(e.button === 2) {
+                camera.fov = 75;
+                camera.updateProjectionMatrix();
+                scene.background = new THREE.Color(0x010205);
+            }
+        };
 
-        document.addEventListener('mousemove', (e) => {
+        // --- BOT AVATARS ---
+        const bots = [];
+        for(let i=0; i<5; i++) {
+            const bot = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: 0xff0044}));
+            bot.position.set(Math.random()*40-20, 1, Math.random()*40-20);
+            scene.add(bot);
+            bots.push(bot);
+        }
+
+        // --- ENGINE LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            let speed = (keys['e'] || keys['shift']) ? 0.35 : 0.18;
+            
+            // Apply requested movement logic
+            let moveX = 0, moveZ = 0;
+            if(keys['w']) moveZ -= speed;
+            if(keys['s']) moveZ += speed;
+            if(keys['a']) moveX -= speed;
+            if(keys['d']) moveX += speed;
+
+            const moveVec = new THREE.Vector3(moveX, 0, moveZ).applyQuaternion(player.quaternion);
+            player.position.add(moveVec);
+
+            // Simple Recoil smoothing
+            gunMesh.position.lerp(new THREE.Vector3(0.5, -0.4, -0.7), 0.1);
+
+            renderer.render(scene, camera);
+        }
+
+        // Mouse Lock Setup
+        document.body.onclick = () => document.body.requestPointerLock();
+        document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === document.body) {
                 player.rotation.y -= e.movementX * 0.002;
                 camera.rotation.x -= e.movementY * 0.002;
-                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
             }
         });
 
-        // --- Game Loop (Input Handling) ---
-        function update() {
-            const speed = (keys['shift'] || keys['e']) ? 0.3 : 0.15; // Slide / Sprint
-            const direction = new THREE.Vector3();
-
-            // Movement Logic
-            if (keys['w'] && keys['a']) { // Northwest
-                direction.z -= speed; direction.x -= speed;
-            } else if (keys['s'] && keys['d']) { // Southeast
-                direction.z += speed; direction.x += speed;
-            } else if (keys['a'] && keys['d']) { // Northeast (Logic override per your request)
-                direction.z -= speed; direction.x += speed;
-            } else if (keys['a'] && keys['s']) { // Southwest
-                direction.z += speed; direction.x -= speed;
-            } else if (keys['w']) direction.z -= speed;
-            else if (keys['s']) direction.z += speed;
-            else if (keys['a']) direction.x -= speed;
-            else if (keys['d']) direction.x += speed;
-
-            direction.applyQuaternion(player.quaternion);
-            player.position.add(direction);
-
-            renderer.render(scene, camera);
-            requestAnimationFrame(update);
-        }
-
-        // --- Combat Controls ---
-        window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) console.log("Shoot (Left Click)");
-            if (e.button === 2) console.log("Scope / Special (Right Click)");
-        });
-
-        window.addEventListener('contextmenu', e => e.preventDefault()); // Disable right-click menu
-
-        update();
+        window.oncontextmenu = (e) => e.preventDefault();
+        animate();
     </script>
 </body>
 </html>
